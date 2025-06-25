@@ -15,27 +15,48 @@ type ListUnitArgs struct {
 	Names []string `json:"names"`
 }
 
-func validStates() []string {
+func ValidStates() []string {
 	return []string{"active", "dead", "inactive", "loaded", "mounted", "not-found", "plugged", "running", "all"}
 }
 
-func UnitTool() mcp.Tool {
-	return mcp.NewTool("list_units",
-		mcp.WithDescription("List the requested systemd units on the systemd."),
-		mcp.WithArray("states",
-			mcp.Description("List units with the given states. Defaults to running units"),
-			mcp.Enum(validStates()...),
-		),
-		mcp.WithDestructiveHintAnnotation(false),
-		mcp.WithIdempotentHintAnnotation(true),
+// create a resource desription for getting the systemd states
+func UnitRessource(state string) mcp.Resource {
+	return mcp.NewResource(fmt.Sprintf("systemd://units/state/%s", state),
+		fmt.Sprintf("systemd units and services on the host with the state %s", state),
+		mcp.WithMIMEType("application/json"),
 	)
 }
-func UnitRessource() mcp.ResourceTemplate {
-	return mcp.NewResourceTemplate("units://units/state/{state}",
-		fmt.Sprintf("systemd units and services on the host, valid states are: (%s)", strings.Join(validStates(), ",")),
-		mcp.WithTemplateDescription("list all the units with the requested state"),
-		mcp.WithTemplateMIMEType("application/json"),
-	)
+
+// create a handler for to get the given state, some extra handing for
+// the 'all' state, which is not implemted by the API
+func (conn *Connection) CreateResHandler(state string) func(context.Context, mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+	return func(ctx context.Context,
+		request mcp.ReadResourceRequest,
+	) (resources []mcp.ResourceContents, err error) {
+		var units []dbus.UnitStatus
+		if strings.EqualFold(state, "all") {
+			units, err = conn.dbus.ListUnitsContext(ctx)
+			if err != nil {
+				return resources, err
+			}
+		} else {
+			units, err = conn.dbus.ListUnitsFilteredContext(ctx, []string{state})
+			if err != nil {
+				return nil, err
+			}
+		}
+		jsonByte, err := json.Marshal(&units)
+		if err != nil {
+			return nil, err
+		}
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "application/json",
+				Text:     string(jsonByte),
+			},
+		}, nil
+	}
 }
 
 func (conn *Connection) UnitResourceListState(ctx context.Context,
@@ -46,7 +67,7 @@ func (conn *Connection) UnitResourceListState(ctx context.Context,
 		return nil, fmt.Errorf("malformed URI")
 	}
 	state := uriSplit[len(uriSplit)-1]
-	if !slices.Contains(validStates(), state) {
+	if !slices.Contains(ValidStates(), state) {
 		return nil, fmt.Errorf("invalid unit state requested: %s", state)
 
 	}
@@ -74,6 +95,17 @@ func (conn *Connection) UnitResourceListState(ctx context.Context,
 		},
 	}, nil
 }
+func UnitTool() mcp.Tool {
+	return mcp.NewTool("list_units",
+		mcp.WithDescription("List the requested systemd units on the systemd."),
+		mcp.WithArray("states",
+			mcp.Description("List units with the given states. Defaults to running units"),
+			mcp.Enum(ValidStates()...),
+		),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+	)
+}
 
 func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
 	var err error
@@ -82,7 +114,7 @@ func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToo
 		reqStates = []string{"running"}
 	} else {
 		for _, s := range reqStates {
-			if !slices.Contains(validStates(), s) {
+			if !slices.Contains(ValidStates(), s) {
 				return mcp.NewToolResultError(fmt.Sprintf("requsted state %s is not a valid state", s)), nil
 			}
 		}
