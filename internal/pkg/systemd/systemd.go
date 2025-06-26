@@ -8,14 +8,17 @@ import (
 
 // DbusConnection is an interface that abstracts the dbus connection.
 // This is primarily for testing purposes.
+/*
 type DbusConnection interface {
 	Close()
 	ListUnitsContext(ctx context.Context) ([]dbus.UnitStatus, error)
 	ListUnitsFilteredContext(ctx context.Context, filter []string) ([]dbus.UnitStatus, error)
+	ListUnitsByNamesContext(ctx context.Context, filter []string) ([]dbus.UnitStatus, error)
 }
+*/
 
 type Connection struct {
-	dbus DbusConnection
+	dbus *dbus.Conn
 }
 
 // opens a new user connection to the dbus

@@ -59,44 +59,7 @@ func (conn *Connection) CreateResHandler(state string) func(context.Context, mcp
 	}
 }
 
-func (conn *Connection) UnitResourceListState(ctx context.Context,
-	request mcp.ReadResourceRequest,
-) (resources []mcp.ResourceContents, err error) {
-	uriSplit := strings.Split(request.Params.URI, "/")
-	if len(uriSplit) == 0 {
-		return nil, fmt.Errorf("malformed URI")
-	}
-	state := uriSplit[len(uriSplit)-1]
-	if !slices.Contains(ValidStates(), state) {
-		return nil, fmt.Errorf("invalid unit state requested: %s", state)
-
-	}
-	var units []dbus.UnitStatus
-	if strings.EqualFold(state, "all") {
-		units, err = conn.dbus.ListUnitsContext(ctx)
-		if err != nil {
-			return resources, err
-		}
-	} else {
-		units, err = conn.dbus.ListUnitsFilteredContext(ctx, []string{state})
-		if err != nil {
-			return nil, err
-		}
-	}
-	jsonByte, err := json.Marshal(&units)
-	if err != nil {
-		return nil, err
-	}
-	return []mcp.ResourceContents{
-		mcp.TextResourceContents{
-			URI:      request.Params.URI,
-			MIMEType: "application/json",
-			Text:     string(jsonByte),
-		},
-	}, nil
-}
-
-func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
+func (conn *Connection) ListUnitHandlerState(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
 	var err error
 	reqStates := request.GetStringSlice("states", []string{""})
 	if len(reqStates) == 0 {
@@ -136,6 +99,30 @@ func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToo
 		})
 	}
 	jsonByte, err := json.Marshal(&lightUnits)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), err
+	}
+	return mcp.NewToolResultText(string(jsonByte)), nil
+}
+func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
+	var err error
+	reqNames := request.GetStringSlice("names", []string{""})
+	// reqStates := request.GetStringSlice("states", []string{""})
+	var units []dbus.UnitStatus
+	units, err = conn.dbus.ListUnitsByPatternsContext(ctx, []string{}, reqNames)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), err
+	}
+	unitProps := make([]map[string]interface{}, 1, 1)
+	for _, u := range units {
+		props, err := conn.dbus.GetAllPropertiesContext(ctx, u.Name)
+		fmt.Println(u.Name, props)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), err
+		}
+		unitProps = append(unitProps, props)
+	}
+	jsonByte, err := json.Marshal(&unitProps)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), err
 	}

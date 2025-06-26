@@ -24,7 +24,7 @@ func main() {
 	}
 	systemConn, err := systemd.NewSystem(context.Background())
 	// add tool handler
-	s.AddTool(mcp.NewTool("list_systemd_host_units",
+	s.AddTool(mcp.NewTool("list_systemd_host_units_by_state",
 		mcp.WithDescription("List the requested systemd units and services running on the host."),
 		mcp.WithArray("states",
 			mcp.Description("List units with the given states."),
@@ -33,9 +33,12 @@ func main() {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 	),
-		mcp.NewTypedToolHandler(systemConn.ListUnitHandler))
-	s.AddTool(mcp.NewTool("list_systemd_user_units",
-		mcp.WithDescription("List the requested systemd units and services of the user."),
+		mcp.NewTypedToolHandler(systemConn.ListUnitHandlerState))
+	s.AddTool(mcp.NewTool("list_systemd_user_units_by_state",
+		mcp.WithDescription(`List the requested systemd units and services of
+the user session. These are services started for the user session. When logging in
+through console this is just a simple init scope, more services are started for a
+graphical desktop session.`),
 		mcp.WithArray("states",
 			mcp.Description("List units with the given states."),
 			mcp.Enum(systemd.ValidStates()...),
@@ -43,9 +46,18 @@ func main() {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 	),
-		mcp.NewTypedToolHandler(systemConn.ListUnitHandler))
-	// add ressource handler
-	// s.AddResourceTemplate(systemd.UnitRessource(), conn.UnitResourceListState)
+		mcp.NewTypedToolHandler(systemConn.ListUnitHandlerState))
+	s.AddTool(mcp.NewTool("list_systemd_user_units_by_name",
+		mcp.WithDescription("List the requested systemd unit."),
+		mcp.WithArray("names",
+			mcp.Description(`List units with the given by it's exact name.
+Regexp can be used as e.g. foo* expands to foo.service`),
+		),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+	),
+		mcp.NewTypedToolHandler(systemConn.ListUnitHandlerNameState))
+	// add ressource handler, mcphost doen't use them but still add them
 	for _, state := range systemd.ValidStates() {
 		s.AddResource(
 			systemd.UnitRessource(state),
