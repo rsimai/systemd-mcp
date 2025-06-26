@@ -19,9 +19,17 @@ type Connection struct {
 }
 
 // opens a new user connection to the dbus
-func New(ctx context.Context) (conn *Connection, err error) {
+func NewUser(ctx context.Context) (conn *Connection, err error) {
 	conn = new(Connection)
 	conn.dbus, err = dbus.NewUserConnectionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return conn, err
+}
+func NewSystem(ctx context.Context) (conn *Connection, err error) {
+	conn = new(Connection)
+	conn.dbus, err = dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
 	}

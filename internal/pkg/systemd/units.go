@@ -95,17 +95,6 @@ func (conn *Connection) UnitResourceListState(ctx context.Context,
 		},
 	}, nil
 }
-func UnitTool() mcp.Tool {
-	return mcp.NewTool("list_units",
-		mcp.WithDescription("List the requested systemd units on the systemd."),
-		mcp.WithArray("states",
-			mcp.Description("List units with the given states. Defaults to running units"),
-			mcp.Enum(ValidStates()...),
-		),
-		mcp.WithDestructiveHintAnnotation(false),
-		mcp.WithIdempotentHintAnnotation(true),
-	)
-}
 
 func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
 	var err error
@@ -120,6 +109,7 @@ func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToo
 		}
 	}
 	var units []dbus.UnitStatus
+	// route can't be taken as it confuses small modells
 	if slices.Contains(reqStates, "all") {
 		units, err = conn.dbus.ListUnitsContext(ctx)
 		if err != nil {
@@ -131,13 +121,28 @@ func (conn *Connection) ListUnitHandler(ctx context.Context, request mcp.CallToo
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 	}
-	jsonByte, err := json.Marshal(&units)
+	type LightUnit struct {
+		Name        string `json:"name"`
+		State       string `json:"state"`
+		Description string `json:"description"`
+	}
+
+	lightUnits := []LightUnit{}
+	for _, u := range units {
+		lightUnits = append(lightUnits, LightUnit{
+			Name:        u.Name,
+			State:       u.ActiveState,
+			Description: u.Description,
+		})
+	}
+	jsonByte, err := json.Marshal(&lightUnits)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), err
 	}
 	return mcp.NewToolResultText(string(jsonByte)), nil
 }
 
+// helper function to get the valid states
 func (conn *Connection) ListStatesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var err error
 	units, err := conn.dbus.ListUnitsContext(ctx)

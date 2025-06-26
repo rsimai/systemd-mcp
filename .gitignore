@@ -1,0 +1,4 @@
+# ignore binary
+systemd-mcp
+# ignore the vendored stuff
+vendor/*
