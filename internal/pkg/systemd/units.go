@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/suse/systemd-mcp/internal/pkg/util"
 	"slices"
 	"strings"
 
@@ -120,6 +121,7 @@ func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, request mc
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), err
 		}
+		props = util.ClearMap(props)
 		unitProps = append(unitProps, props)
 	}
 	jsonByte, err := json.Marshal(&unitProps)
