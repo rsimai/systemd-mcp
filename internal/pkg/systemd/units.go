@@ -4,23 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/suse/systemd-mcp/internal/pkg/util"
 	"slices"
-	"strings"
 
 	"github.com/coreos/go-systemd/v22/dbus"
-	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/suse/systemd-mcp/internal/pkg/util"
 )
-
-type ListUnitArgs struct {
-	Names []string `json:"names"`
-}
 
 func ValidStates() []string {
 	return []string{"active", "dead", "inactive", "loaded", "mounted", "not-found", "plugged", "running", "all"}
 }
 
 // create a resource desription for getting the systemd states
+/*
 func UnitRessource(state string) mcp.Resource {
 	return mcp.NewResource(fmt.Sprintf("systemd://units/state/%s", state),
 		fmt.Sprintf("systemd units and services on the host with the state %s", state),
@@ -59,16 +55,21 @@ func (conn *Connection) CreateResHandler(state string) func(context.Context, mcp
 		}, nil
 	}
 }
+*/
 
-func (conn *Connection) ListUnitHandlerState(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
+type ListUnitParams struct {
+	States []string `json:"states"`
+}
+
+func (conn *Connection) ListUnitHandlerState(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListUnitParams]) (*mcp.CallToolResultFor[any], error) {
 	var err error
-	reqStates := request.GetStringSlice("states", []string{""})
+	reqStates := params.Arguments.States
 	if len(reqStates) == 0 {
 		reqStates = []string{"running"}
 	} else {
 		for _, s := range reqStates {
 			if !slices.Contains(ValidStates(), s) {
-				return mcp.NewToolResultError(fmt.Sprintf("requsted state %s is not a valid state", s)), nil
+				return nil, fmt.Errorf("requsted state %s is not a valid state", s)
 			}
 		}
 	}
@@ -77,12 +78,12 @@ func (conn *Connection) ListUnitHandlerState(ctx context.Context, request mcp.Ca
 	if slices.Contains(reqStates, "all") {
 		units, err = conn.dbus.ListUnitsContext(ctx)
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+			return nil, err
 		}
 	} else {
 		units, err = conn.dbus.ListUnitsFilteredContext(ctx, reqStates)
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+			return nil, err
 		}
 	}
 	type LightUnit struct {
@@ -91,52 +92,69 @@ func (conn *Connection) ListUnitHandlerState(ctx context.Context, request mcp.Ca
 		Description string `json:"description"`
 	}
 
-	lightUnits := []LightUnit{}
+	txtContenList := []mcp.Content{}
 	for _, u := range units {
-		lightUnits = append(lightUnits, LightUnit{
+		lightUnit := LightUnit{
 			Name:        u.Name,
 			State:       u.ActiveState,
 			Description: u.Description,
+		}
+		jsonByte, _ := json.Marshal(&lightUnit)
+		txtContenList = append(txtContenList, &mcp.TextContent{
+			Text: string(jsonByte),
 		})
+
 	}
-	jsonByte, err := json.Marshal(&lightUnits)
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), err
-	}
-	return mcp.NewToolResultText(string(jsonByte)), nil
+
+	return &mcp.CallToolResultFor[any]{
+		Content: txtContenList,
+	}, nil
 }
-func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, request mcp.CallToolRequest, args ListUnitArgs) (*mcp.CallToolResult, error) {
+
+type ListUnitNameParams struct {
+	Names []string `json:"names"`
+}
+
+/*
+Handler to list the unit by name
+*/
+func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListUnitNameParams]) (*mcp.CallToolResultFor[any], error) {
 	var err error
-	reqNames := request.GetStringSlice("names", []string{""})
+	reqNames := params.Arguments.Names
 	// reqStates := request.GetStringSlice("states", []string{""})
 	var units []dbus.UnitStatus
 	units, err = conn.dbus.ListUnitsByPatternsContext(ctx, []string{}, reqNames)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), err
+		return nil, err
 	}
-	unitProps := make([]map[string]interface{}, 1, 1)
+	// unitProps := make([]map[string]interface{}, 1, 1)
+	txtContentList := []mcp.Content{}
 	for _, u := range units {
 		props, err := conn.dbus.GetAllPropertiesContext(ctx, u.Name)
-		fmt.Println(u.Name, props)
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), err
+			return nil, err
 		}
 		props = util.ClearMap(props)
-		unitProps = append(unitProps, props)
+		jsonByte, _ := json.Marshal(&props)
+
+		txtContentList = append(txtContentList, &mcp.TextContent{
+			Text: string(jsonByte),
+		})
+
 	}
-	jsonByte, err := json.Marshal(&unitProps)
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), err
+	if len(txtContentList) == 0 {
+		return nil, fmt.Errorf("found no units with name pattern: %v", reqNames)
 	}
-	return mcp.NewToolResultText(string(jsonByte)), nil
+	return &mcp.CallToolResultFor[any]{
+		Content: txtContentList,
+	}, nil
 }
 
 // helper function to get the valid states
-func (conn *Connection) ListStatesHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	var err error
+func (conn *Connection) ListStatesHandler(ctx context.Context) (lst []string, err error) {
 	units, err := conn.dbus.ListUnitsContext(ctx)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
+		return
 	}
 	states := make(map[string]bool)
 	for _, u := range units {
@@ -150,13 +168,8 @@ func (conn *Connection) ListStatesHandler(ctx context.Context, request mcp.CallT
 			states[u.SubState] = true
 		}
 	}
-	stateSlc := []string{}
 	for key := range states {
-		stateSlc = append(stateSlc, key)
+		lst = append(lst, key)
 	}
-	jsonBytes, err := json.Marshal(stateSlc)
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), err
-	}
-	return mcp.NewToolResultText(fmt.Sprintf(`"valid_states": %s`, string(jsonBytes))), nil
+	return
 }
