@@ -153,7 +153,6 @@ func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, cc *mcp.Se
 			})
 		} else {
 			prop := struct {
-				Name        string `json:"Id"`
 				Id          string `json:"Id"`
 				Description string `json:"Description"`
 
