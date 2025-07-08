@@ -58,7 +58,8 @@ func (conn *Connection) CreateResHandler(state string) func(context.Context, mcp
 */
 
 type ListUnitParams struct {
-	States []string `json:"states"`
+	States  []string `json:"states"`
+	Verbose bool     `json:"verbose"`
 }
 
 func (conn *Connection) ListUnitHandlerState(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListUnitParams]) (*mcp.CallToolResultFor[any], error) {
@@ -94,12 +95,17 @@ func (conn *Connection) ListUnitHandlerState(ctx context.Context, cc *mcp.Server
 
 	txtContenList := []mcp.Content{}
 	for _, u := range units {
-		lightUnit := LightUnit{
-			Name:        u.Name,
-			State:       u.ActiveState,
-			Description: u.Description,
+		var jsonByte []byte
+		if params.Arguments.Verbose {
+			jsonByte, _ = json.Marshal(&u)
+		} else {
+			lightUnit := LightUnit{
+				Name:        u.Name,
+				State:       u.ActiveState,
+				Description: u.Description,
+			}
+			jsonByte, _ = json.Marshal(&lightUnit)
 		}
-		jsonByte, _ := json.Marshal(&lightUnit)
 		txtContenList = append(txtContenList, &mcp.TextContent{
 			Text: string(jsonByte),
 		})
@@ -112,7 +118,8 @@ func (conn *Connection) ListUnitHandlerState(ctx context.Context, cc *mcp.Server
 }
 
 type ListUnitNameParams struct {
-	Names []string `json:"names"`
+	Names   []string `json:"names"`
+	Verbose bool     `json:"debug"`
 }
 
 /*
@@ -135,11 +142,66 @@ func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, cc *mcp.Se
 			return nil, err
 		}
 		props = util.ClearMap(props)
-		jsonByte, _ := json.Marshal(&props)
+		jsonByte, err := json.Marshal(&props)
+		if err != nil {
+			return nil, err
+		}
+		if params.Arguments.Verbose {
 
-		txtContentList = append(txtContentList, &mcp.TextContent{
-			Text: string(jsonByte),
-		})
+			txtContentList = append(txtContentList, &mcp.TextContent{
+				Text: string(jsonByte),
+			})
+		} else {
+			prop := struct {
+				Name        string `json:"Id"`
+				Id          string `json:"Id"`
+				Description string `json:"Description"`
+
+				// Load state info
+				LoadState      string `json:"LoadState"`
+				FragmentPath   string `json:"FragmentPath"`
+				UnitFileState  string `json:"UnitFileState"`
+				UnitFilePreset string `json:"UnitFilePreset"`
+
+				// Active state info
+				ActiveState          string `json:"ActiveState"`
+				SubState             string `json:"SubState"`
+				ActiveEnterTimestamp uint64 `json:"ActiveEnterTimestamp"`
+
+				// Process info
+				InvocationID   string `json:"InvocationID"`
+				MainPID        int    `json:"MainPID"`
+				ExecMainPID    int    `json:"ExecMainPID"`
+				ExecMainStatus int    `json:"ExecMainStatus"`
+
+				// Resource usage
+				TasksCurrent int    `json:"TasksCurrent"`
+				TasksMax     uint64 `json:"TasksMax"`
+				CPUUsageNSec uint64 `json:"CPUUsageNSec"`
+
+				// Control group
+				ControlGroup string `json:"ControlGroup"`
+
+				// Exec commands (simplified - would need additional processing)
+				ExecStartPre [][]interface{} `json:"ExecStartPre"`
+				ExecStart    [][]interface{} `json:"ExecStart"`
+
+				// Additional fields that might be useful
+				Restart       string `json:"Restart"`
+				MemoryCurrent uint64 `json:"MemoryCurrent"`
+			}{}
+			err = json.Unmarshal(jsonByte, &prop)
+			if err != nil {
+				return nil, err
+			}
+			jsonByte, err = json.Marshal(&prop)
+			if err != nil {
+				return nil, err
+			}
+			txtContentList = append(txtContentList, &mcp.TextContent{
+				Text: string(jsonByte),
+			})
+		}
 
 	}
 	if len(txtContentList) == 0 {
