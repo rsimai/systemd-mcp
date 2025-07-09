@@ -27,7 +27,7 @@ func main() {
 			fmt.Sprintf("List the requested systemd units and services on the host with the given state. As result the unit name, descrition and name are listed as json. Valid states are: %v", systemd.ValidStates()),
 			systemConn.ListUnitHandlerState,
 			mcp.Input(
-				mcp.Property("states", mcp.Description("List of the states. The keyword 'all' can be used to get all available units on the system.")),
+				mcp.Property("states", mcp.Description("List of the states. The keyword 'all' can be used to get all available units on the system."), mcp.Enum(systemd.ValidStates())),
 				mcp.Property("verbose", mcp.Description("The verbose flag should only used for debugging and only if the without verbosed too less information was provided.")),
 			)),
 		)
@@ -36,7 +36,24 @@ func main() {
 			systemConn.ListUnitHandlerNameState,
 			mcp.Input(
 				mcp.Property("names", mcp.Description("List units with the given by it's exact name. Regular expressions should be used. The request foo* expands to foo.service.")),
-				mcp.Property("debug", mcp.Description("The verbose flag should only used for debugging and only if without the verbose flag too less information was provided.")),
+				mcp.Property("debug", mcp.Description("The debug flag should only used for debugging and only if without the verbose flag too less information was provided.")),
+			)),
+		)
+		server.AddTools(mcp.NewServerTool("restart_reload_unit",
+			"Reload or restart a unit.",
+			systemConn.RestartReloadUnit,
+			mcp.Input(
+				mcp.Property("name", mcp.Description("Exact name of unit to restart")),
+				mcp.Property("timeout", mcp.Description("Time to wait for the restart or reload to finish. After the timeout the function will return and restart and reload will run in the background and the result can be retreived with a separate function.")),
+				mcp.Property("forcerestart", mcp.Description("Enforce a restart instead of a reload.")),
+				mcp.Property("modes", mcp.Description("mode of the operation. 'replace' should be used per default and replace allready queued jobs. With 'fail' the operation will fail if other operations are in progress."), mcp.Enum(systemd.ValidStates())),
+			)),
+		)
+		server.AddTools(mcp.NewServerTool("check_restart_reload",
+			"Check the reload or restart status of a unit. Can only be called if the restart or reload job had a timeout.",
+			systemConn.CheckForRestartReloadRunning,
+			mcp.Input(
+				mcp.Property("timeout", mcp.Description("Time to wait for the restart or reload to finish. After the timeout the function will return and restart and reload will run in the background and the result can be retreived with a separate function.")),
 			)),
 		)
 	}

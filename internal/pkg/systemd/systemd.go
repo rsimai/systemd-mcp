@@ -13,11 +13,14 @@ type DbusConnection interface {
 	ListUnitsFilteredContext(ctx context.Context, states []string) ([]dbus.UnitStatus, error)
 	ListUnitsByPatternsContext(ctx context.Context, states []string, patterns []string) ([]dbus.UnitStatus, error)
 	GetAllPropertiesContext(ctx context.Context, unitName string) (map[string]interface{}, error)
+	ReloadOrRestartUnitContext(ctx context.Context, name string, mode string, ch chan<- string) (int, error)
+	RestartUnitContext(ctx context.Context, name string, mode string, ch chan<- string) (int, error)
 	Close()
 }
 
 type Connection struct {
-	dbus DbusConnection
+	rchannel chan string
+	dbus     DbusConnection
 }
 
 // opens a new user connection to the dbus
@@ -41,4 +44,5 @@ func NewSystem(ctx context.Context) (conn *Connection, err error) {
 // close the connection
 func (conn *Connection) Close() {
 	conn.dbus.Close()
+	close(conn.rchannel)
 }

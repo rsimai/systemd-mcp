@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -233,4 +234,79 @@ func (conn *Connection) ListStatesHandler(ctx context.Context) (lst []string, er
 		lst = append(lst, key)
 	}
 	return
+}
+
+type RestartReloadParams struct {
+	Name         string `json:"name"`
+	TimeOut      uint   `json:"timeout"`
+	Mode         string `json:"mode"`
+	Forcerestart bool   `json:"forcerestart"`
+}
+
+// return which are define in the upstream documentation as:
+// The mode needs to be one of
+// replace, fail, isolate, ignore-dependencies, ignore-requirements. If
+// "replace" the call will start the unit and its dependencies, possibly
+// replacing already queued jobs that conflict with this. If "fail" the call
+// will start the unit and its dependencies, but will fail if this would change
+// an already queued job. If "isolate" the call will start the unit in question
+// and terminate all units that aren't dependencies of it. If
+// "ignore-dependencies" it will start a unit but ignore all its dependencies.
+// If "ignore-requirements" it will start a unit but only ignore the
+// requirement dependencies. It is not recommended to make use of the latter
+// two options.
+func ValidRestartModes() []string {
+	return []string{"replace", "fail", "isolate", "ignore-dependencies", "ignore-requirements"}
+}
+
+const MaxTimeOut uint = 60
+
+// restart or reload a service
+func (conn *Connection) RestartReloadUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[RestartReloadParams]) (res *mcp.CallToolResultFor[any], err error) {
+	if params.Arguments.Mode == "" {
+		params.Arguments.Mode = "replace"
+	}
+	if !slices.Contains(ValidRestartModes(), params.Arguments.Mode) {
+		return nil, fmt.Errorf("invalid mode for restart or reload: %s", params.Arguments.Mode)
+	}
+	if params.Arguments.TimeOut > MaxTimeOut {
+		return nil, fmt.Errorf("not waiting longer than MaxTimeOut(%d), longer operation will run in the background and result can be gathered with separate function.", MaxTimeOut)
+	}
+	if params.Arguments.Forcerestart {
+		_, err = conn.dbus.RestartUnitContext(ctx, params.Arguments.Name, params.Arguments.Mode, conn.rchannel)
+	} else {
+		_, err = conn.dbus.ReloadOrRestartUnitContext(ctx, params.Arguments.Name, params.Arguments.Mode, conn.rchannel)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return conn.CheckForRestartReloadRunning(ctx, cc, &mcp.CallToolParamsFor[CheckReloadRestartParams]{
+		Arguments: CheckReloadRestartParams{TimeOut: params.Arguments.TimeOut},
+	})
+}
+
+type CheckReloadRestartParams struct {
+	TimeOut uint `json:"timeout"`
+}
+
+// check status of reload or restart
+func (conn *Connection) CheckForRestartReloadRunning(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[CheckReloadRestartParams]) (res *mcp.CallToolResultFor[any], err error) {
+	select {
+	case result := <-conn.rchannel:
+		return &mcp.CallToolResultFor[any]{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: result,
+				},
+			},
+		}, nil
+	case <-time.After(3 * time.Second):
+		return &mcp.CallToolResultFor[any]{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: "Reload or restart still in progress.",
+				},
+			},
+		}, nil
+	}
 }
