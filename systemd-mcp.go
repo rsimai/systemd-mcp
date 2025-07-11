@@ -66,7 +66,7 @@ func main() {
 		slog.Warn("couldn't open log, not adding journal tool", slog.Any("error", err))
 	} else {
 		server.AddTools(mcp.NewServerTool("list_log", descriptionJournal,
-			log.ListLog,
+			log.ListLogTimeout,
 			mcp.Input(
 				mcp.Property("count", mcp.Description("Number of log lines to output")),
 				mcp.Property("unit", mcp.Description("Exact name of the service/unit from which to get the logs. Without log entries of all units are returned.")),

@@ -44,6 +44,33 @@ func (sj *HostLog) seekAndSkip(count uint64) (uint64, error) {
 	}
 }
 
+func (sj *HostLog) ListLogTimeout(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListLogParams]) (*mcp.CallToolResultFor[any], error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	resultChan := make(chan struct {
+		res *mcp.CallToolResultFor[any]
+		err error
+	}, 1)
+
+	go func() {
+		res, err := sj.ListLog(timeoutCtx, cc, params)
+		resultChan <- struct {
+			res *mcp.CallToolResultFor[any]
+			err error
+		}{res: res, err: err}
+	}()
+
+	select {
+	case <-timeoutCtx.Done():
+		// The timeout context was cancelled, meaning the timeout occurred.
+		return nil, fmt.Errorf("timed out: %w", timeoutCtx.Err())
+	case result := <-resultChan:
+		// ListLog completed within the timeout.
+		return result.res, result.err
+	}
+}
+
 // get the lat log entries for a given unit, else just the last messages
 func (sj *HostLog) ListLog(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListLogParams]) (*mcp.CallToolResultFor[any], error) {
 	if params.Arguments.Unit != "" {
@@ -79,18 +106,7 @@ func (sj *HostLog) ListLog(ctx context.Context, cc *mcp.ServerSession, params *m
 
 	}
 	txtContentList := []mcp.Content{}
-	isFirst := true
 	for {
-		ret, err := sj.journal.Next()
-		if err != nil {
-			return nil, fmt.Errorf("failed to read next entry: %w", err)
-		}
-		if ret == 0 && isFirst {
-			return &mcp.CallToolResultFor[any]{
-				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("couldn't match unit: '%s'", params.Arguments.Unit)}},
-			}, nil
-		}
-		isFirst = false
 		entry, err := sj.journal.GetEntry()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get entry: %w", err)
@@ -99,17 +115,17 @@ func (sj *HostLog) ListLog(ctx context.Context, cc *mcp.ServerSession, params *m
 		timestamp := time.Unix(0, int64(entry.RealtimeTimestamp)*int64(time.Microsecond))
 
 		structEntr := struct {
-			Time time.Time         `json:"time"`
-			Unit string            `json:"unit"`
-			Host string            `json:"host"`
-			Msg  string            `json:"message"`
-			Full map[string]string `json:"full"`
+			Time time.Time `json:"time"`
+			Unit string    `json:"unit"`
+			Host string    `json:"host"`
+			Msg  string    `json:"message"`
+			// Full map[string]string `json:"full"`
 		}{
 			Unit: entry.Fields["SYSLOG_IDENTIFIER"],
 			Time: timestamp,
 			Host: entry.Fields["_HOSTNAME"],
 			Msg:  entry.Fields["MESSAGE"],
-			Full: entry.Fields,
+			// Full: entry.Fields,
 		}
 		if structEntr.Unit == "" {
 			structEntr.Unit = fmt.Sprintf("%s:%s", entry.Fields["_SYSTEMD_UNIT"], entry.Fields["_SYSTEMD_USER_UNIT"])
@@ -121,6 +137,10 @@ func (sj *HostLog) ListLog(ctx context.Context, cc *mcp.ServerSession, params *m
 		txtContentList = append(txtContentList, &mcp.TextContent{
 			Text: string(jsonByte),
 		})
+		ret, err := sj.journal.Next()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read next entry: %w", err)
+		}
 		if ret == 0 {
 			break
 		}
