@@ -19,6 +19,7 @@ type DbusConnection interface {
 	KillUnitContext(ctx context.Context, name string, signal int32)
 	EnableUnitFilesContext(ctx context.Context, files []string, runtime bool, force bool) (bool, []dbus.EnableUnitFileChange, error)
 	DisableUnitFilesContext(ctx context.Context, files []string, runtime bool) ([]dbus.DisableUnitFileChange, error)
+	ListUnitFilesContext(ctx context.Context) ([]dbus.UnitFile, error)
 	Close()
 }
 

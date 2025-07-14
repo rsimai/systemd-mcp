@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
 	"time"
 
@@ -259,13 +260,6 @@ func ValidRestartModes() []string {
 	return []string{"replace", "fail", "isolate", "ignore-dependencies", "ignore-requirements"}
 }
 
-func ValidRestartModesEnum() (ret []mcp.SchemaOption) {
-	for _, m := range ValidRestartModes() {
-		ret = append(ret, mcp.Enum(m))
-	}
-	return
-}
-
 const MaxTimeOut uint = 60
 
 // restart or reload a service
@@ -358,7 +352,16 @@ func (conn *Connection) StopUnit(ctx context.Context, cc *mcp.ServerSession, par
 }
 
 type EnableParams struct {
-	File string `json:"file"`
+	File    string `json:"file"`
+	Disable bool   `json"disable"`
+}
+
+func (conn *Connection) EnableDisableUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[EnableParams]) (res *mcp.CallToolResultFor[any], err error) {
+	if params.Arguments.Disable {
+		return conn.DisableUnit(ctx, cc, params)
+	} else {
+		return conn.EnableUnit(ctx, cc, params)
+	}
 }
 
 func (conn *Connection) EnableUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[EnableParams]) (res *mcp.CallToolResultFor[any], err error) {
@@ -398,4 +401,76 @@ func (conn *Connection) EnableUnit(ctx context.Context, cc *mcp.ServerSession, p
 			Content: txtContentList,
 		}, nil
 	}
+}
+
+func (conn *Connection) DisableUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[EnableParams]) (res *mcp.CallToolResultFor[any], err error) {
+	disabledRes, err := conn.dbus.DisableUnitFilesContext(ctx, []string{params.Arguments.File}, false)
+	if err != nil {
+		return nil, fmt.Errorf("error when disabling: %w", err)
+	}
+	if len(disabledRes) == 0 {
+		return &mcp.CallToolResultFor[any]{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: fmt.Sprintf("nothing changed for %s", params.Arguments.File),
+				},
+			},
+		}, nil
+	} else {
+		txtContentList := []mcp.Content{}
+		for _, res := range disabledRes {
+			resJson := struct {
+				Type        string `json:"type"`
+				Filename    string `json:"filename"`
+				Destination string `json:"destination"`
+			}{
+				Type:        res.Type,
+				Filename:    res.Filename,
+				Destination: res.Destination,
+			}
+			jsonByte, err := json.Marshal(resJson)
+			if err != nil {
+				return nil, fmt.Errorf("could not unmarshall result: %w", err)
+			}
+			txtContentList = append(txtContentList, &mcp.TextContent{
+				Text: string(jsonByte),
+			})
+		}
+		return &mcp.CallToolResultFor[any]{
+			Content: txtContentList,
+		}, nil
+	}
+}
+
+type ListUnitFilesParams struct {
+	Type []string `json:"types"`
+}
+
+// returns the unit files known to systemd
+func (conn *Connection) ListUnitFiles(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[EnableParams]) (res *mcp.CallToolResultFor[any], err error) {
+	unitList, err := conn.dbus.ListUnitFilesContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	txtContentList := []mcp.Content{}
+	for _, unit := range unitList {
+		uInfo := struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		}{
+			Name: path.Base(unit.Path),
+			Type: unit.Type,
+		}
+		jsonByte, err := json.Marshal(uInfo)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshall result: %w", err)
+		}
+		txtContentList = append(txtContentList, &mcp.TextContent{
+			Text: string(jsonByte),
+		})
+
+	}
+	return &mcp.CallToolResultFor[any]{
+		Content: txtContentList,
+	}, nil
 }

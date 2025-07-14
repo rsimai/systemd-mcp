@@ -55,7 +55,7 @@ func main() {
 			mcp.Input(
 				mcp.Property("name", mcp.Description("Exact name of unit to stop"), mcp.Required(true)),
 				mcp.Property("timeout", mcp.Description("Time to wait for the stop to finish. After the timeout the function will return and stop run in the background and the result can be retreived with a separate function.")),
-				mcp.Property("kill", mcp.Description("Kill the unit instead of shurtting down cleanly.")),
+				mcp.Property("kill", mcp.Description("Kill the unit instead of shutting down cleanly. Use this option only if the unit doesn't shut down, even after waiting.")),
 				mcp.Property("modes", mcp.Description("mode of the operation. 'replace' should be used per default and replace allready queued jobs. With 'fail' the operation will fail if other operations are in progress."), mcp.Enum("all")),
 			)),
 		)
@@ -66,12 +66,18 @@ func main() {
 				mcp.Property("timeout", mcp.Description("Time to wait for the restart or reload to finish. After the timeout the function will return and restart and reload will run in the background and the result can be retreived with a separate function.")),
 			)),
 		)
-		server.AddTools(mcp.NewServerTool("enable_unit",
+		server.AddTools(mcp.NewServerTool("enable_or_disable_unit",
 			"Enable an unit or service for the next startup of the system.",
-			systemConn.EnableUnit,
-			mcp.Input(
-				mcp.Property("file", mcp.Description("Name of the service or unit if the unit is in the standard location. Takes the absolute path if the unit or service is not placed under '/etc/' or '/usr/lib/systemd'. Does not take wildcards. For the service foo, this would be 'foo.service' if foo is installed by a package."), mcp.Required(true)),
-			)),
+			systemConn.EnableDisableUnit,
+			mcp.Input(mcp.Property("file", mcp.Description("Name of the service or unit if the unit is in the standard location. Takes the absolute path if the unit or service is not placed under '/etc/' or '/usr/lib/systemd'. Does not take wildcards. For the service foo, this would be 'foo.service' if foo is installed by a package."), mcp.Required(true))),
+			mcp.Input(mcp.Property("disable"), mcp.Description("Set to true to disable the unit instead of enable.")),
+		),
+		)
+		server.AddTools(mcp.NewServerTool("list_unit_files",
+			"Returns a list of all the unit files known to systemd. This tool can be used to determine the correct names for all the other correct unit/service names for the other calls.",
+			systemConn.ListUnitFiles,
+			mcp.Input(mcp.Property("types", mcp.Description("List of the type which should be returned."), mcp.Required(false))),
+		),
 		)
 	}
 	descriptionJournal := "Get the last log entries for the given service or unit."
