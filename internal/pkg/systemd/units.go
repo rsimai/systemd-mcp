@@ -60,11 +60,11 @@ func (conn *Connection) CreateResHandler(state string) func(context.Context, mcp
 */
 
 type ListUnitParams struct {
-	States  []string `json:"states"`
-	Verbose bool     `json:"verbose"`
+	States  []string `json:"states" jsonschema:"List of the states. The keyword 'all' can be used to get all available units on the system."`
+	Verbose bool     `json:"verbose" jsonschema:"The verbose flag should only used for debugging and only if the without verbosed too less information was provided."`
 }
 
-func (conn *Connection) ListUnitHandlerState(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListUnitParams]) (*mcp.CallToolResultFor[any], error) {
+func (conn *Connection) ListUnitState(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListUnitParams]) (*mcp.CallToolResultFor[any], error) {
 	var err error
 	reqStates := params.Arguments.States
 	if len(reqStates) == 0 {
@@ -120,8 +120,8 @@ func (conn *Connection) ListUnitHandlerState(ctx context.Context, cc *mcp.Server
 }
 
 type ListUnitNameParams struct {
-	Names   []string `json:"names"`
-	Verbose bool     `json:"debug"`
+	Names   []string `json:"names" jsonschema:"List units with the given by it's exact name. Regular expressions should be used. The request foo* expands to foo.service."`
+	Verbose bool     `json:"debug" jsonschema:"The debug flag should only used for debugging and only if without the verbose flag too less information was provided."`
 }
 
 /*
@@ -238,10 +238,10 @@ func (conn *Connection) ListStatesHandler(ctx context.Context) (lst []string, er
 }
 
 type RestartReloadParams struct {
-	Name         string `json:"name"`
-	TimeOut      uint   `json:"timeout"`
-	Mode         string `json:"mode"`
-	Forcerestart bool   `json:"forcerestart"`
+	Name         string `json:"name" jsonschema:"Exact name of unit to restart"`
+	TimeOut      uint   `json:"timeout" jsonschema:"Time to wait for the restart or reload to finish. After the timeout the function will return and restart and reload will run in the background and the result can be retreived with a separate function."`
+	Mode         string `json:"mode" jsonschema:"Enforce a restart instead of a reload."`
+	Forcerestart bool   `json:"forcerestart" jsonschema:"mode of the operation. 'replace' should be used per default and replace allready queued jobs. With 'fail' the operation will fail if other operations are in progress."`
 }
 
 // return which are define in the upstream documentation as:
@@ -287,7 +287,7 @@ func (conn *Connection) RestartReloadUnit(ctx context.Context, cc *mcp.ServerSes
 }
 
 type CheckReloadRestartParams struct {
-	TimeOut uint `json:"timeout"`
+	TimeOut uint `json:"timeout" jsonschema:"Time to wait for the restart or reload to finish. After the timeout the function will return and restart and reload will run in the background and the result can be retreived with a separate function."`
 }
 
 // check status of reload or restart
@@ -321,10 +321,10 @@ func (conn *Connection) CheckForRestartReloadRunning(ctx context.Context, cc *mc
 }
 
 type StopParams struct {
-	Name    string `json:"name"`
-	TimeOut uint   `json:"timeout"`
-	Mode    string `json:"mode"`
-	Kill    bool   `json:"kill"`
+	Name    string `json:"name" jsonschema:"Exact name of unit to stop"`
+	TimeOut uint   `json:"timeout" jsonschema:"Time to wait for the stop to finish. After the timeout the function will return and stop run in the background and the result can be retreived with a separate function."`
+	Mode    string `json:"mode" jsonschema:"mode of the operation. 'replace' should be used per default and replace allready queued jobs. With 'fail' the operation will fail if other operations are in progress."`
+	Kill    bool   `json:"kill" jsonschema:"Kill the unit instead of shutting down cleanly. Use this option only if the unit doesn't shut down, even after waiting."`
 }
 
 // Stop or kill the given unit
@@ -352,8 +352,8 @@ func (conn *Connection) StopUnit(ctx context.Context, cc *mcp.ServerSession, par
 }
 
 type EnableParams struct {
-	File    string `json:"file"`
-	Disable bool   `json"disable"`
+	File    string `json:"file" jsonschema:"Name of the service or unit if the unit is in the standard location. Takes the absolute path if the unit or service is not placed under '/etc/' or '/usr/lib/systemd'. Does not take wildcards. For the service foo, this would be 'foo.service' if foo is installed by a package."`
+	Disable bool   `json"disable" jsonschema:"Set to true to disable the unit instead of enable."`
 }
 
 func (conn *Connection) EnableDisableUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[EnableParams]) (res *mcp.CallToolResultFor[any], err error) {
@@ -443,7 +443,7 @@ func (conn *Connection) DisableUnit(ctx context.Context, cc *mcp.ServerSession, 
 }
 
 type ListUnitFilesParams struct {
-	Type []string `json:"types"`
+	Type []string `json:"types" jsonschema:"List of the type which should be returned."`
 }
 
 // returns the unit files known to systemd

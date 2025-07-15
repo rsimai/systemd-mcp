@@ -29,8 +29,8 @@ func (log *HostLog) Close() error {
 }
 
 type ListLogParams struct {
-	Count int    `json:"count"`
-	Unit  string `json:"unit"`
+	Count int    `json:"count" jsonschema:"Number of log lines to output"`
+	Unit  string `json:"unit" jsonschema:"Exact name of the service/unit from which to get the logs. Without an unit name the entries of all units are returned. This parameter is optional."`
 }
 
 func (sj *HostLog) seekAndSkip(count uint64) (uint64, error) {
