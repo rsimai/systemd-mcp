@@ -15,11 +15,13 @@ type DbusConnection interface {
 	GetAllPropertiesContext(ctx context.Context, unitName string) (map[string]interface{}, error)
 	ReloadOrRestartUnitContext(ctx context.Context, name string, mode string, ch chan<- string) (int, error)
 	RestartUnitContext(ctx context.Context, name string, mode string, ch chan<- string) (int, error)
+	StartUnitContext(ctx context.Context, name string, mode string, ch chan<- string) (int, error)
 	StopUnitContext(ctx context.Context, name string, mode string, ch chan<- string) (int, error)
 	KillUnitContext(ctx context.Context, name string, signal int32)
 	EnableUnitFilesContext(ctx context.Context, files []string, runtime bool, force bool) (bool, []dbus.EnableUnitFileChange, error)
 	DisableUnitFilesContext(ctx context.Context, files []string, runtime bool) ([]dbus.DisableUnitFileChange, error)
 	ListUnitFilesContext(ctx context.Context) ([]dbus.UnitFile, error)
+
 	Close()
 }
 

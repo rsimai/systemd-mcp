@@ -26,17 +26,21 @@ func main() {
 	} else {
 		// add systend tool handler
 		mcp.AddTool(server, &mcp.Tool{
-			Name:        "list_systemd_host_units_by_state",
+			Name:        "list_systemd_units_by_state",
 			Description: fmt.Sprintf("List the requested systemd units and services on the host with the given state. Doesn't list the services in other states. As result the unit name, descrition and name are listed as json. Valid states are: %v", systemd.ValidStates()),
 		}, systemConn.ListUnitState)
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "list_systemd_units_by_name",
-			Description: "List the requested systemd unit by it's name. The output is a json formated with all available non empty fields.",
+			Description: "List the requested systemd unit by it's names or patterns. The output is a json formated with all available non empty fields. This are properites of the unit/service.",
 		}, systemConn.ListUnitHandlerNameState)
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "restart_reload_unit",
 			Description: "Reload or restart a unit or service.",
 		}, systemConn.RestartReloadUnit)
+		mcp.AddTool(server, &mcp.Tool{
+			Name:        "start_reload_unit",
+			Description: "Start a unit or service. This doesn't enable the unit.",
+		}, systemConn.StartUnit)
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "stop_unit",
 			Description: "Stop a unit or service or unit.",
@@ -47,7 +51,7 @@ func main() {
 		}, systemConn.CheckForRestartReloadRunning)
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "enable_or_disable_unit",
-			Description: "Enable an unit or service for the next startup of the system.",
+			Description: "Enable an unit or service for the next startup of the system. This doesn't start the unit.",
 		}, systemConn.EnableDisableUnit)
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "list_unit_files",

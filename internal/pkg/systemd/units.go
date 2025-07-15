@@ -120,7 +120,7 @@ func (conn *Connection) ListUnitState(ctx context.Context, cc *mcp.ServerSession
 }
 
 type ListUnitNameParams struct {
-	Names   []string `json:"names" jsonschema:"List units with the given by it's exact name. Regular expressions should be used. The request foo* expands to foo.service."`
+	Names   []string `json:"names" jsonschema:"List units with the given by their names. Regular expressions should be used. The request foo* expands to foo.service. Useful patterns are '*.timer' for all timers, '*.service' for all services, '*.mount for all mounts, '*.socket' for all sockets."`
 	Verbose bool     `json:"debug" jsonschema:"The debug flag should only used for debugging and only if without the verbose flag too less information was provided."`
 }
 
@@ -176,7 +176,7 @@ func (conn *Connection) ListUnitHandlerNameState(ctx context.Context, cc *mcp.Se
 				ExecMainStatus int    `json:"ExecMainStatus"`
 
 				// Resource usage
-				TasksCurrent int    `json:"TasksCurrent"`
+				TasksCurrent uint64 `json:"TasksCurrent"`
 				TasksMax     uint64 `json:"TasksMax"`
 				CPUUsageNSec uint64 `json:"CPUUsageNSec"`
 
@@ -278,6 +278,24 @@ func (conn *Connection) RestartReloadUnit(ctx context.Context, cc *mcp.ServerSes
 	} else {
 		_, err = conn.dbus.ReloadOrRestartUnitContext(ctx, params.Arguments.Name, params.Arguments.Mode, conn.rchannel)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return conn.CheckForRestartReloadRunning(ctx, cc, &mcp.CallToolParamsFor[CheckReloadRestartParams]{
+		Arguments: CheckReloadRestartParams{TimeOut: params.Arguments.TimeOut},
+	})
+}
+func (conn *Connection) StartUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[RestartReloadParams]) (res *mcp.CallToolResultFor[any], err error) {
+	if params.Arguments.Mode == "" {
+		params.Arguments.Mode = "replace"
+	}
+	if !slices.Contains(ValidRestartModes(), params.Arguments.Mode) {
+		return nil, fmt.Errorf("invalid mode for restart or reload: %s", params.Arguments.Mode)
+	}
+	if params.Arguments.TimeOut > MaxTimeOut {
+		return nil, fmt.Errorf("not waiting longer than MaxTimeOut(%d), longer operation will run in the background and result can be gathered with separate function.", MaxTimeOut)
+	}
+	_, err = conn.dbus.StartUnitContext(ctx, params.Arguments.Name, params.Arguments.Mode, conn.rchannel)
 	if err != nil {
 		return nil, err
 	}
