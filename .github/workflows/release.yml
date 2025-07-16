@@ -1,0 +1,35 @@
+name: Release binary
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+permissions: write-all
+
+jobs:
+  create-bin:
+    name: Release binary
+    runs-on: ubuntu-latest
+    steps:
+      - id: checkout
+        uses: actions/checkout@v3 
+      - id: install-deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install libsystemd-dev
+      - id: go-setup
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.0'
+      - id: binary-build
+        run: |
+          make build
+      - id: upload-binary
+        uses: xresloader/upload-to-github-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          file: ./systemd-mcp
+          overwrite: true
+          update_latest_release: true
+
