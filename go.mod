@@ -1,6 +1,8 @@
 module github.com/suse/systemd-mcp
 
-go 1.24.3
+go 1.23.0
+
+toolchain go1.24.4
 
 require (
 	github.com/coreos/go-systemd/v22 v22.5.0
