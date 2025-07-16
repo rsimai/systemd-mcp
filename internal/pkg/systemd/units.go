@@ -9,13 +9,10 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/modelcontextprotocol/go-sdk/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/suse/systemd-mcp/internal/pkg/util"
 )
-
-func ValidStates() []string {
-	return []string{"active", "dead", "inactive", "loaded", "mounted", "not-found", "plugged", "running", "all"}
-}
 
 // create a resource desription for getting the systemd states
 /*
@@ -58,10 +55,26 @@ func (conn *Connection) CreateResHandler(state string) func(context.Context, mcp
 	}
 }
 */
+func ValidStates() []string {
+	return []string{"active", "dead", "inactive", "loaded", "mounted", "not-found", "plugged", "running", "all"}
+}
 
 type ListUnitParams struct {
 	States  []string `json:"states" jsonschema:"List of the states. The keyword 'all' can be used to get all available units on the system."`
 	Verbose bool     `json:"verbose" jsonschema:"The verbose flag should only used for debugging and only if the without verbosed too less information was provided."`
+}
+
+func GetListUnitsParamsSchema() (*jsonschema.Schema, error) {
+	schema, err := jsonschema.For[ListUnitParams]()
+	if err != nil {
+		return nil, err
+	}
+	validList := []any{}
+	for _, s := range ValidStates() {
+		validList = append(validList, any(s))
+	}
+	schema.Properties["states"].Enum = validList
+	return schema, nil
 }
 
 func (conn *Connection) ListUnitState(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[ListUnitParams]) (*mcp.CallToolResultFor[any], error) {
@@ -240,7 +253,7 @@ func (conn *Connection) ListStatesHandler(ctx context.Context) (lst []string, er
 type RestartReloadParams struct {
 	Name         string `json:"name" jsonschema:"Exact name of unit to restart"`
 	TimeOut      uint   `json:"timeout" jsonschema:"Time to wait for the restart or reload to finish. After the timeout the function will return and restart and reload will run in the background and the result can be retreived with a separate function."`
-	Mode         string `json:"mode" jsonschema:"Enforce a restart instead of a reload."`
+	Mode         string `json:"mode" jsonschema:"Mode used for the restart or reload. 'replace' should be used."`
 	Forcerestart bool   `json:"forcerestart" jsonschema:"mode of the operation. 'replace' should be used per default and replace allready queued jobs. With 'fail' the operation will fail if other operations are in progress."`
 }
 
@@ -261,6 +274,19 @@ func ValidRestartModes() []string {
 }
 
 const MaxTimeOut uint = 60
+
+func GetRestsartReloadParamsSchema() (*jsonschema.Schema, error) {
+	schema, err := jsonschema.For[RestartReloadParams]()
+	if err != nil {
+		return nil, err
+	}
+	validList := []any{}
+	for _, s := range ValidRestartModes() {
+		validList = append(validList, any(s))
+	}
+	schema.Properties["mode"].Enum = validList
+	return schema, nil
+}
 
 // restart or reload a service
 func (conn *Connection) RestartReloadUnit(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[RestartReloadParams]) (res *mcp.CallToolResultFor[any], err error) {
