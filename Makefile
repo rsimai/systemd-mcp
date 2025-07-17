@@ -3,15 +3,15 @@ GO_FILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 godeps=$(shell 2>/dev/null go list -mod vendor -deps -f '{{if not .Standard}}{{ $dep := . }}{{range .GoFiles}}{{$dep.Dir}}/{{.}} {{end}}{{end}}' $(1) | sed "s%$(shell pwd)/%%g")
 
 # Install parameters
-PREFIX ?= /usr/local
+PREFIX ?= /usr
 DESTDIR ?=
 
 .PHONY: all build vendor test format lint clean dist install
 
 all: build
 
-build: vendor $(godeps)
-	go build -o $(GO_BIN) .
+build: $(godeps)
+	go build -o $(GO_BIN) -mod=vendor .
 
 vendor:
 	go mod tidy
