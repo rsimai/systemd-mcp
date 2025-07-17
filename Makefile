@@ -2,7 +2,11 @@ GO_BIN=systemd-mcp
 GO_FILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 godeps=$(shell 2>/dev/null go list -mod vendor -deps -f '{{if not .Standard}}{{ $dep := . }}{{range .GoFiles}}{{$dep.Dir}}/{{.}} {{end}}{{end}}' $(1) | sed "s%$(shell pwd)/%%g")
 
-.PHONY: all build vendor test format lint clean dist
+# Install parameters
+PREFIX ?= /usr/local
+DESTDIR ?=
+
+.PHONY: all build vendor test format lint clean dist install
 
 all: build
 
@@ -32,4 +36,8 @@ clean:
 
 dist: build vendor
 	tar -czvf $(GO_BIN).tar.gz $(GO_BIN) vendor
+
+install: build
+	install -d -m 0755 "$(DESTDIR)$(PREFIX)/bin"
+	install -m 0755 "$(GO_BIN)" "$(DESTDIR)$(PREFIX)/bin/$(GO_BIN)"
 
