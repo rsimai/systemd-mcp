@@ -11,7 +11,7 @@ import (
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/modelcontextprotocol/go-sdk/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/suse/systemd-mcp/internal/pkg/util"
+	"github.com/openSUSE/systemd-mcp/internal/pkg/util"
 )
 
 // create a resource desription for getting the systemd states

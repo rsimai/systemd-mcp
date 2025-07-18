@@ -9,8 +9,8 @@ import (
 	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/suse/systemd-mcp/internal/pkg/journal"
-	"github.com/suse/systemd-mcp/internal/pkg/systemd"
+	"github.com/openSUSE/systemd-mcp/internal/pkg/journal"
+	"github.com/openSUSE/systemd-mcp/internal/pkg/systemd"
 )
 
 var httpAddr = flag.String("http", "", "if set, use streamable HTTP at this address, instead of stdin/stdout")

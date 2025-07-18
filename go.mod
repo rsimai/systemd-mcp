@@ -1,4 +1,4 @@
-module github.com/suse/systemd-mcp
+module github.com/openSUSE/systemd-mcp
 
 go 1.23.0
 
