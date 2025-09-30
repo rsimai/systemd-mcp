@@ -21,7 +21,8 @@ func main() {
 	slog.SetDefault(logger)
 	server := mcp.NewServer(&mcp.Implementation{
 		Name:    "Systemd connection",
-		Version: "0.0.1"}, nil)
+		Version: "0.0.1",
+	}, nil)
 	systemConn, err := systemd.NewSystem(context.Background())
 	if err != nil {
 		slog.Warn("couldn't add systemd tools", slog.Any("error", err))
@@ -86,7 +87,7 @@ func main() {
 		slog.Info("MCP handler listening at", slog.String("address", *httpAddr))
 		http.ListenAndServe(*httpAddr, handler)
 	} else {
-		t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), os.Stdout)
+		t := &mcp.LoggingTransport{Transport: &mcp.StdioTransport{}, Writer: os.Stdout}
 		if err := server.Run(context.Background(), t); err != nil {
 			slog.Error("Server failed", slog.Any("error", err))
 		}
