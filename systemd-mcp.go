@@ -82,7 +82,7 @@ func main() {
 		slog.Info("MCP handler listening at", slog.String("address", *httpAddr))
 		http.ListenAndServe(*httpAddr, handler)
 	} else {
-		t := &mcp.LoggingTransport{Transport: &mcp.StdioTransport{}, Writer: os.Stdout}
+		t := &mcp.LoggingTransport{Transport: &mcp.StdioTransport{}, Writer: os.Stderr}
 		if err := server.Run(context.Background(), t); err != nil {
 			slog.Error("Server failed", slog.Any("error", err))
 		}
