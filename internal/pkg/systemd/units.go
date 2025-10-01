@@ -61,7 +61,7 @@ func ValidStates() []string {
 
 type ListUnitParams struct {
 	State   string `json:"state" jsonschema:"List units that are in this state. The keyword 'all' can be used to get all available units on the system."`
-	Verbose bool   `json:"verbose" jsonschema:"The verbose flag should only used for debugging and only if the without verbosed too less information was provided."`
+	Verbose bool   `json:"verbose" jsonschema:"Set to true for more detail. Otherwise set to false."`
 }
 
 func (conn *Connection) ListUnitState(ctx context.Context, req *mcp.CallToolRequest, params *ListUnitParams) (*mcp.CallToolResult, any, error) {
@@ -119,7 +119,7 @@ func (conn *Connection) ListUnitState(ctx context.Context, req *mcp.CallToolRequ
 
 type ListUnitNameParams struct {
 	Names   []string `json:"names" jsonschema:"List units with the given by their names. Regular expressions should be used. The request foo* expands to foo.service. Useful patterns are '*.timer' for all timers, '*.service' for all services, '*.mount for all mounts, '*.socket' for all sockets."`
-	Verbose bool     `json:"debug" jsonschema:"The debug flag should only used for debugging and only if without the verbose flag too less information was provided."`
+	Verbose bool     `json:"verbose" jsonschema:"Set to true for more detail. Otherwise set to false."`
 }
 
 /*
