@@ -60,44 +60,29 @@ func ValidStates() []string {
 }
 
 type ListUnitParams struct {
-	States  []string `json:"states" jsonschema:"List of the states. The keyword 'all' can be used to get all available units on the system."`
-	Verbose bool     `json:"verbose" jsonschema:"The verbose flag should only used for debugging and only if the without verbosed too less information was provided."`
-}
-
-func GetListUnitsParamsSchema() (*jsonschema.Schema, error) {
-	schema, err := jsonschema.For[ListUnitParams](nil)
-	if err != nil {
-		return nil, err
-	}
-	validList := []any{}
-	for _, s := range ValidStates() {
-		validList = append(validList, any(s))
-	}
-	schema.Properties["states"].Enum = validList
-	return schema, nil
+	State   string `json:"state" jsonschema:"List units that are in this state. The keyword 'all' can be used to get all available units on the system."`
+	Verbose bool   `json:"verbose" jsonschema:"The verbose flag should only used for debugging and only if the without verbosed too less information was provided."`
 }
 
 func (conn *Connection) ListUnitState(ctx context.Context, req *mcp.CallToolRequest, params *ListUnitParams) (*mcp.CallToolResult, any, error) {
 	var err error
-	reqStates := params.States
-	if len(reqStates) == 0 {
-		reqStates = []string{"running"}
+	reqState := params.State
+	if reqState == "" {
+		reqState = "running"
 	} else {
-		for _, s := range reqStates {
-			if !slices.Contains(ValidStates(), s) {
-				return nil, nil, fmt.Errorf("requsted state %s is not a valid state", s)
-			}
+		if !slices.Contains(ValidStates(), reqState) {
+			return nil, nil, fmt.Errorf("requsted state %s is not a valid state", reqState)
 		}
 	}
 	var units []dbus.UnitStatus
 	// route can't be taken as it confuses small modells
-	if slices.Contains(reqStates, "all") {
+	if reqState == "all" {
 		units, err = conn.dbus.ListUnitsContext(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		units, err = conn.dbus.ListUnitsFilteredContext(ctx, reqStates)
+		units, err = conn.dbus.ListUnitsFilteredContext(ctx, []string{reqState})
 		if err != nil {
 			return nil, nil, err
 		}

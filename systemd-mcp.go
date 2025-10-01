@@ -28,15 +28,10 @@ func main() {
 		slog.Warn("couldn't add systemd tools", slog.Any("error", err))
 	} else {
 		// add systend tool handler
-		listStateSchema, err := systemd.GetListUnitsParamsSchema()
-		if err != nil {
-			panic(err)
-		}
 		mcp.AddTool(server, &mcp.Tool{
 			Title:       "List units",
 			Name:        "list_systemd_units_by_state",
 			Description: fmt.Sprintf("List the requested systemd units and services on the host with the given state. Doesn't list the services in other states. As result the unit name, descrition and name are listed as json. Valid states are: %v", systemd.ValidStates()),
-			InputSchema: listStateSchema,
 		}, systemConn.ListUnitState)
 		mcp.AddTool(server, &mcp.Tool{
 			Name:        "list_systemd_units_by_name",
